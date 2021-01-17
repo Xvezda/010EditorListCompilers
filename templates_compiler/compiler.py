@@ -20,7 +20,7 @@ class TemplateObject(object):
         self.mask = mask or ''
         self.options = {
             'visible': True,
-            'run_on_load': False,
+            'run_on_load': True,
             'show_editor_on_load': False
         }
         self.source = source or ''
