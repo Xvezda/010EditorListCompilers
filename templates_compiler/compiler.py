@@ -19,6 +19,7 @@ class TemplateObject(object):
         self.name = name or self.filename
         self.mask = mask or ''
         self.options = {
+            'visible': True,
             'run_on_load': False,
             'show_editor_on_load': False
         }
@@ -85,8 +86,8 @@ class TemplateListCompiler(object):
                 # Write mask length, mask
                 f.write(struct.pack('<I', len(template.mask)))
                 f.write(wchars(template.mask))
-                # Unknown 4 byte
-                f.write(struct.pack('<I', 1))
+                # Write visibility flag
+                f.write(struct.pack('<I', int(template.options.get('visible', True))))
                 # Write filename length, filename
                 f.write(struct.pack('<I', len(template.filename)))
                 f.write(wchars(template.filename))
