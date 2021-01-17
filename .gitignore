@@ -127,3 +127,10 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Binary formats
+*.1[ts]l
+
+# 010 Editor files
+*.bt
+*.1sc
