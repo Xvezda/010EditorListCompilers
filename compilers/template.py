@@ -50,7 +50,7 @@ class TemplateListCompiler(_010EditorListCompiler):
         ))
 
     def add_file(self, filename):
-        with open(filename, 'r') as f:
+        with open(filename, 'r', encoding='iso-8859-1') as f:
             name = os.path.basename(os.path.splitext(filename)[0]) or filename
             filename_ = '($TEMPLATEDIR)/%s' % os.path.basename(filename)
             source = self.unix2dos(f.read()) + '\n'
