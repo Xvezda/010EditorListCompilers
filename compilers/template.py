@@ -12,6 +12,8 @@ import os.path
 import logging
 logger = logging.getLogger(__name__)
 
+from .base import _010EditorListCompiler
+
 
 class TemplateObject(object):
     def __init__(self, filename, name=None, mask=None, source=None):
@@ -26,33 +28,21 @@ class TemplateObject(object):
         self.source = source or ''
 
 
-# TODO: Add abstract compiler class
-class TemplateListCompiler(object):
+class TemplateListCompiler(_010EditorListCompiler):
     """Template list compiler for 010 Editor."""
-    EXT = '1tl'
-    EOF = b'%EOF\x01\x00\x00\x00'
-    MAGIC = b'%1TL=\x00\x00\x00'
+    EXT_ARGS = ('t',)
+    MAGIC_ARGS = ('T',)
+    DEF_NAME = 'TemplateList'
 
     def __init__(self):
-        self.templates = []
+        super().__init__()
+        self._buffer = b''
 
-    @staticmethod
-    def _search_mask(data):
-        search = re.search(
-            r'^(?:/[*/])?\s*File Mask:\s*([^\s]+)(?:\*/)?\s*$',
-            data,
-            re.M
-        )
-        if not search:
-            return ''
-        return search.group(1)
-
-    @staticmethod
-    def _unix2dos(data):
-        return re.sub(r'\r{2,}', '\r', data.replace('\n', '\r\n'), re.M)
+    def write(self, writable):
+        writable.write(self._buffer)
 
     def add(self, filename, name=None, mask=None, source=None):
-        self.templates.append(TemplateObject(
+        super().add(TemplateObject(
             filename,
             name,
             mask,
@@ -63,72 +53,94 @@ class TemplateListCompiler(object):
         with open(filename, 'r') as f:
             name = os.path.basename(os.path.splitext(filename)[0]) or filename
             filename_ = '($TEMPLATEDIR)/%s' % os.path.basename(filename)
-            source = self._unix2dos(f.read()) + '\n'
-            mask = self._search_mask(source)
+            source = self.unix2dos(f.read()) + '\n'
+            mask = self.search_mask(source)
             # Add template object
             self.add(filename_, name, mask, source)
 
+    def _write(self, b):
+        try:
+            self._buffer += b
+        except TypeError:
+            self._buffer += b.encode()
+
+    def _tell(self):
+        return len(self._buffer)
+
     def compile(self):
-        # TODO: Fix hard coded filename
-        with open(f'TemplateList.{self.EXT}', 'wb') as f:
-            total_count = len(self.templates)
-            wchars = lambda w: b''.join(map(lambda b: struct.pack('<H', ord(b)), list(w)))
+        self._write_header()
+        # Write each template object metadata
+        self._write_metadatas()
+        self._write_entries()
+        self._write_files()
+        # Write End Of File signature
+        self._write_eof()
 
-            # Write magic numbers
-            f.write(self.MAGIC)
-            # Write total count
-            f.write(struct.pack('<I', total_count))
-            # Write each template object metadata
-            for template in self.templates:
-                # Write name length, name
-                f.write(struct.pack('<I', len(template.name)))
-                f.write(wchars(template.name))
-                # Write mask length, mask
-                f.write(struct.pack('<I', len(template.mask)))
-                f.write(wchars(template.mask))
-                # Write visibility flag
-                f.write(struct.pack('<I', int(template.options.get('visible', True))))
-                # Write filename length, filename
-                f.write(struct.pack('<I', len(template.filename)))
-                f.write(wchars(template.filename))
-                # TODO: Apply template object option
-                # Write "run on load" option
-                f.write(struct.pack('<I', 1))
-                # Write "show editor on load" option
-                f.write(struct.pack('<I', 0))
+    def _write_header(self):
+        # Write magic numbers
+        self._write(self.MAGIC)
+        # Write total count
+        self._write(struct.pack('<I', len(self)))
 
-            # File datas starting after offset and filesize datas.
-            # So, offset begins at
-            # = current_offset + total_count * (offset<4byte> + filesize <4byte>)
-            calculated_offset = f.tell() + total_count * 8
-            # Repeat loop for writing offset, filesize
-            for template in self.templates:
-                # Write offset
-                f.write(struct.pack('<I', calculated_offset))
-                # Write filesize
-                # Don't know why, but actual value is +1
-                filesize = len(template.source) + 1
-                f.write(struct.pack('<I', filesize))
-                # Increase offset
-                calculated_offset += filesize
+    def _write_metadatas(self):
+        for template in iter(self):
+            options = {**template.options}
+            # Write name length, name
+            self._write(struct.pack('<I', len(template.name)))
+            self._write(self.str2wstr(template.name))
+            # Write mask length, mask
+            self._write(struct.pack('<I', len(template.mask)))
+            self._write(self.str2wstr(template.mask))
+            # Write visibility flag
+            self._write(struct.pack('<I', int(options.get('visible', True))))
+            # Write filename length, filename
+            self._write(struct.pack('<I', len(template.filename)))
+            self._write(self.str2wstr(template.filename))
+            # Write "run on load" option
+            self._write(
+                struct.pack('<I', int(options.get('run_on_load', True))))
+            # Write "show editor on load" option
+            self._write(
+                struct.pack('<I', int(options.get('show_editor_on_load', False))))
 
-            # Final loop
-            for template in self.templates:
-                # Write source
-                f.write(template.source.encode('utf-8'))
+    def _write_entries(self):
+        # File datas starting after offset and filesize datas.
+        # So, offset begins at
+        # = current_offset + total_count * (offset<4byte> + filesize <4byte>)
+        calculated_offset = self._tell() + len(self) * 8
+        # Repeat loop for writing offset, filesize
+        for template in iter(self):
+            # Write offset
+            self._write(struct.pack('<I', calculated_offset))
+            # Write filesize
+            # Don't know why, but actual value is +1
+            filesize = len(template.source) + 1
+            self._write(struct.pack('<I', filesize))
+            # Increase offset
+            calculated_offset += filesize
 
-            # Write End Of File signature
-            f.write(self.EOF)
+    def _write_files(self):
+        # Final loop
+        for template in iter(self):
+            # Write source
+            self._write(template.source.encode())
+
+    def _write_eof(self):
+        self._write(self.EOF)
+
+    def __len__(self):
+        return len(list(iter(self)))
 
 
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
+    parser.add_argument('--output', '-o', type=str)
     parser.add_argument('files', nargs='+')
     args = parser.parse_args()
 
     compiler = TemplateListCompiler()
     for filename in getattr(args, 'files', []):
         compiler.add_file(filename)
-    compiler.compile()
+    compiler.save(args.output)
 
