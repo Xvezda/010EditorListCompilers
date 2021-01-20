@@ -70,6 +70,13 @@ class ScriptListCompiler(_010EditorListCompiler):
             self._write_uint32(options.get('run_on_shutdown'))
 
 
+def _main(args):
+    compiler = ScriptListCompiler()
+    for filename in getattr(args, 'files', []):
+        compiler.add_file(filename)
+    compiler.save(args.output)
+
+
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
@@ -77,9 +84,5 @@ if __name__ == '__main__':
     parser.add_argument('files', nargs='+')
     args = parser.parse_args()
 
-    compiler = ScriptListCompiler()
-    for filename in getattr(args, 'files', []):
-        compiler.add_file(filename)
-    compiler.save(args.output)
-
+    _main(args)
 
