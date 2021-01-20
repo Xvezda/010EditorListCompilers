@@ -128,9 +128,6 @@ class TemplateListCompiler(_010EditorListCompiler):
     def _write_eof(self):
         self._write(self.EOF)
 
-    def __len__(self):
-        return len(list(iter(self)))
-
 
 if __name__ == '__main__':
     import argparse

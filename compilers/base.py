@@ -92,3 +92,6 @@ class _010EditorListCompiler(Compiler):
     def __iter__(self):
         return iter(self._iterable)
 
+    def __len__(self):
+        return len(list(iter(self)))
+
