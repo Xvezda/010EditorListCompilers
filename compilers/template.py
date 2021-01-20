@@ -5,6 +5,7 @@
 # https://opensource.org/licenses/MIT.
 
 
+import io
 import re
 import struct
 import os.path
@@ -36,10 +37,13 @@ class TemplateListCompiler(_010EditorListCompiler):
 
     def __init__(self):
         super().__init__()
-        self._buffer = b''
+        self._buffer = io.BytesIO()
 
     def write(self, writable):
-        writable.write(self._buffer)
+        offset = self._buffer.tell()
+        self._buffer.seek(0)
+        writable.write(self._buffer.read())
+        self._buffer.seek(offset)
 
     def add(self, filename, name=None, mask=None, source=None):
         super().add(TemplateObject(
@@ -60,15 +64,15 @@ class TemplateListCompiler(_010EditorListCompiler):
 
     def _write(self, b):
         try:
-            self._buffer += b
+            self._buffer.write(b)
         except TypeError:
-            self._buffer += b.encode()
+            self._buffer.write(b.encode())
 
     def _write_u32(self, data):
         self._write(struct.pack('<I', int(data)))
 
     def _tell(self):
-        return len(self._buffer)
+        return self._buffer.tell()
 
     def compile(self):
         self._write_header()
