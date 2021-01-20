@@ -10,24 +10,30 @@ import re
 import struct
 import os.path
 import contextlib
+from typing import (
+    Optional, Any, AnyStr, BinaryIO
+)
 
 import logging
 logger = logging.getLogger(__name__)
 
+import pydantic
+
 from .base import _010EditorListCompiler
 
 
-class TemplateObject(object):
-    def __init__(self, filename, name=None, mask=None, source=None):
-        self.filename = filename
-        self.name = name or self.filename
-        self.mask = mask or ''
-        self.options = {
-            'visible': True,
-            'run_on_load': True,
-            'show_editor_on_load': False
-        }
-        self.source = source or ''
+class TemplateOptionObject(pydantic.BaseModel):
+    visible: bool = True
+    run_on_load: bool = True
+    show_editor_on_load: bool = False
+
+
+class TemplateObject(pydantic.BaseModel):
+    filename: str
+    name: str
+    mask: Optional[str]
+    options = TemplateOptionObject()
+    source: Optional[str]
 
 
 class TemplateListCompiler(_010EditorListCompiler):
@@ -40,39 +46,41 @@ class TemplateListCompiler(_010EditorListCompiler):
         super().__init__()
         self._buffer = io.BytesIO()
 
-    def write(self, writable):
+    def write(self, writable: BinaryIO):
         writable.write(self.link())
 
-    def add(self, filename, name=None, mask=None, source=None):
-        super().add(TemplateObject(
-            filename,
-            name,
-            mask,
-            source,
-        ))
+    def add(self, *,
+            filename: str, name: str, mask: str, source: str) -> None:
+        tmplobj = TemplateObject(
+            filename=filename,
+            name=name,
+            mask=mask,
+            source=source
+        )
+        super().add(tmplobj)
 
-    def add_file(self, filename):
+    def add_file(self, filename: str) -> None:
         with open(filename, 'r', encoding='iso-8859-1') as f:
             name = os.path.basename(os.path.splitext(filename)[0]) or filename
             filename_ = '($TEMPLATEDIR)/%s' % os.path.basename(filename)
             source = self.unix2dos(f.read()) + '\n'
             mask = self.search_mask(source)
             # Add template object
-            self.add(filename_, name, mask, source)
+            self.add(filename=filename_, name=name, mask=mask, source=source)
 
-    def _write(self, b):
+    def _write(self, b: AnyStr) -> None:
         try:
             self._buffer.write(b)
         except TypeError:
             self._buffer.write(b.encode())
 
-    def _write_u32(self, data):
+    def _write_u32(self, data: Any) -> None:
         self._write(struct.pack('<I', int(data)))
 
-    def _tell(self):
+    def _tell(self) -> int:
         return self._buffer.tell()
 
-    def compile(self):
+    def compile(self) -> None:
         self._write_header()
         # Write each template object metadata
         self._write_metadatas()
@@ -92,19 +100,19 @@ class TemplateListCompiler(_010EditorListCompiler):
         finally:
             seekable.seek(offset)
 
-    def link(self):
+    def link(self) -> bytes:
         with self._restoring_position(self._buffer) as b:
             return b.read()
 
-    def _write_header(self):
+    def _write_header(self) -> None:
         # Write magic numbers
         self._write(self.MAGIC)
         # Write total count
         self._write_u32(len(self))
 
-    def _write_metadatas(self):
+    def _write_metadatas(self) -> None:
         for template in iter(self):
-            options = {**template.options}
+            options = {**template.options.dict()}
             # Write name length, name
             self._write_u32(len(template.name))
             self._write(self.str2wstr(template.name))
@@ -121,7 +129,7 @@ class TemplateListCompiler(_010EditorListCompiler):
             # Write "show editor on load" option
             self._write_u32(options.get('show_editor_on_load', False))
 
-    def _write_entries(self):
+    def _write_entries(self) -> None:
         # File datas starting after offset and filesize datas.
         # So, offset begins at
         # = current_offset + total_count * (offset<4byte> + filesize <4byte>)
@@ -137,13 +145,12 @@ class TemplateListCompiler(_010EditorListCompiler):
             # Increase offset
             calculated_offset += filesize
 
-    def _write_files(self):
-        # Final loop
+    def _write_files(self) -> None:
         for template in iter(self):
             # Write source
             self._write(template.source.encode())
 
-    def _write_eof(self):
+    def _write_eof(self) -> None:
         self._write(self.EOF)
 
 
