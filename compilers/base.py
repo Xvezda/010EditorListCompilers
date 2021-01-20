@@ -5,22 +5,37 @@
 # https://opensource.org/licenses/MIT.
 
 
+import io
 import abc
 import typing
 import re
 import struct
+import ctypes
+
+import pydantic
+from collections.abc import Iterable
+from typing import (
+    Optional, Any, AnyStr, IO, BinaryIO
+)
+
+from .types import (
+    Compilable,
+    Seekable,
+    ObjectFile
+)
 
 
-class Compiler(object, metaclass=abc.ABCMeta):
-    def __init__(self):
-        super().__init__()
-
+class Compiler(abc.ABC):
     @abc.abstractmethod
     def add(self, *args, **kwds):
         pass
 
     @abc.abstractmethod
-    def compile(self, *args, **kwds):
+    def parse(self, *args, **kwds) -> bytes:
+        pass
+
+    @abc.abstractmethod
+    def compile(self, *args, **kwds) -> ObjectFile:
         pass
 
     @abc.abstractmethod
@@ -36,8 +51,9 @@ class Compiler(object, metaclass=abc.ABCMeta):
         pass
 
 
+BASEBIT_SIZE = ctypes.sizeof(ctypes.c_uint32())
 
-class _010EditorListCompiler(Compiler):
+class Abstract010EditorListCompiler(Compiler, metaclass=abc.ABCMeta):
     EOF = b'%EOF\x01\x00\x00\x00'
     EXT_FMT = '1{}l'
     MAGIC_FMT = '%1{}L=\x00\x00\x00'
@@ -58,7 +74,11 @@ class _010EditorListCompiler(Compiler):
                         fmt.format(*getattr(self, prefix + args_suffix)))
 
     @typing.overload
-    def compile(self, *args, **kwds):
+    def parse(self, stream: IO):
+        pass
+
+    @typing.overload
+    def parse(self, source: AnyStr) -> bytes:
         pass
 
     def add(self, obj):
@@ -105,12 +125,12 @@ class _010EditorListCompiler(Compiler):
     def unix2dos(data):
         return re.sub(r'\r{2,}', '\r', data.replace('\n', '\r\n'), re.M)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterable[Compilable]:
         return iter(self._iterable)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(list(iter(self)))
 
-    def __bytes__(self):
+    def __bytes__(self) -> bytes:
         return bytes(self.link())
 
