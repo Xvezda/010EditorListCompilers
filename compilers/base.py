@@ -43,12 +43,14 @@ class _010EditorListCompiler(Compiler):
         self._setattrs()
 
     def _setattrs(self):
+        fmt_suffix = '_FMT'
+        args_suffix = '_ARGS'
         for attr in dir(self):
-            if attr.endswith('_FMT'):
+            if attr.endswith(fmt_suffix):
                 fmt = getattr(self, attr)
-                prefix = attr[:-len('_FMT')]
+                prefix = attr[:-len(fmt_suffix)]
                 setattr(self, prefix,
-                        fmt.format(*getattr(self, prefix + '_ARGS')))
+                        fmt.format(*getattr(self, prefix + args_suffix)))
 
     @typing.overload
     def compile(self, *args, **kwds):
@@ -70,24 +72,29 @@ class _010EditorListCompiler(Compiler):
     def write(self, *args, **kwds):
         pass
 
-    @staticmethod
-    def search_mask(data):
-        search = re.search(
-            r'^(?:/[*/])?\s*File Mask:\s*([^\s]+)(?:\*/)?\s*$',
-            data,
-            re.M
-        )
+    @classmethod
+    def search_metadata(cls, key, data):
+        regexp = r'^(?:/[*/])?\s*%s:\s*([^\s]+)(?:\*/)?\s*$'
+        search = re.search(regexp % re.escape(key), data, re.M)
         if not search:
             return ''
         return search.group(1)
 
+    @classmethod
+    def search_mask(cls, data):
+        return cls.search_metadata('File Mask', data)
+
+    @classmethod
+    def chr2wchr(cls, chr_):
+        return struct.pack('<H', ord(chr_))
+
+    @classmethod
+    def str2wstr(cls, str_):
+        return b''.join(map(cls.chr2wchr, list(str_)))
+
     @staticmethod
     def unix2dos(data):
         return re.sub(r'\r{2,}', '\r', data.replace('\n', '\r\n'), re.M)
-
-    @staticmethod
-    def str2wstr(str_):
-        return b''.join(map(lambda b: struct.pack('<H', ord(b)), list(str_)))
 
     def __iter__(self):
         return iter(self._iterable)
