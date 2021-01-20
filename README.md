@@ -1,6 +1,6 @@
 # 010EditorListCompilers
 
-A compiler to build binary file which used for [010 Editor](https://www.sweetscape.com/010editor/) configuration.
+A third-party compiler to build binary file which used for [010 Editor](https://www.sweetscape.com/010editor/) configuration.
 
 
 ## Usage
