@@ -40,10 +40,7 @@ class TemplateListCompiler(_010EditorListCompiler):
         self._buffer = io.BytesIO()
 
     def write(self, writable):
-        offset = self._buffer.tell()
-        self._buffer.seek(0)
-        writable.write(self._buffer.read())
-        self._buffer.seek(offset)
+        writable.write(self.link())
 
     def add(self, filename, name=None, mask=None, source=None):
         super().add(TemplateObject(
@@ -82,6 +79,13 @@ class TemplateListCompiler(_010EditorListCompiler):
         self._write_files()
         # Write End Of File signature
         self._write_eof()
+
+    def link(self):
+        offset = self._buffer.tell()
+        self._buffer.seek(0)
+        binary = self._buffer.read()
+        self._buffer.seek(offset)
+        return binary
 
     def _write_header(self):
         # Write magic numbers

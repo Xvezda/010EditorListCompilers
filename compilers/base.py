@@ -31,6 +31,11 @@ class Compiler(object, metaclass=abc.ABCMeta):
     def write(self, *args, **kwds):
         pass
 
+    @abc.abstractmethod
+    def link(self, *args, **kwds):
+        pass
+
+
 
 class _010EditorListCompiler(Compiler):
     EOF = b'%EOF\x01\x00\x00\x00'
@@ -72,6 +77,10 @@ class _010EditorListCompiler(Compiler):
     def write(self, *args, **kwds):
         pass
 
+    @typing.overload
+    def link(self, *args, **kwds):
+        pass
+
     @classmethod
     def search_metadata(cls, key, data):
         regexp = r'^(?:/[*/])?\s*%s:\s*([^\s]+)(?:\*/)?\s*$'
@@ -101,4 +110,7 @@ class _010EditorListCompiler(Compiler):
 
     def __len__(self):
         return len(list(iter(self)))
+
+    def __bytes__(self):
+        return bytes(self.link())
 
