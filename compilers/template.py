@@ -64,6 +64,9 @@ class TemplateListCompiler(_010EditorListCompiler):
         except TypeError:
             self._buffer += b.encode()
 
+    def _write_u32(self, data):
+        self._write(struct.pack('<I', int(data)))
+
     def _tell(self):
         return len(self._buffer)
 
@@ -80,28 +83,26 @@ class TemplateListCompiler(_010EditorListCompiler):
         # Write magic numbers
         self._write(self.MAGIC)
         # Write total count
-        self._write(struct.pack('<I', len(self)))
+        self._write_u32(len(self))
 
     def _write_metadatas(self):
         for template in iter(self):
             options = {**template.options}
             # Write name length, name
-            self._write(struct.pack('<I', len(template.name)))
+            self._write_u32(len(template.name))
             self._write(self.str2wstr(template.name))
             # Write mask length, mask
-            self._write(struct.pack('<I', len(template.mask)))
+            self._write_u32(len(template.mask))
             self._write(self.str2wstr(template.mask))
             # Write visibility flag
-            self._write(struct.pack('<I', int(options.get('visible', True))))
+            self._write_u32(options.get('visible', True))
             # Write filename length, filename
-            self._write(struct.pack('<I', len(template.filename)))
+            self._write_u32(len(template.filename))
             self._write(self.str2wstr(template.filename))
             # Write "run on load" option
-            self._write(
-                struct.pack('<I', int(options.get('run_on_load', True))))
+            self._write_u32(options.get('run_on_load', True))
             # Write "show editor on load" option
-            self._write(
-                struct.pack('<I', int(options.get('show_editor_on_load', False))))
+            self._write_u32(options.get('show_editor_on_load', False))
 
     def _write_entries(self):
         # File datas starting after offset and filesize datas.
@@ -111,11 +112,11 @@ class TemplateListCompiler(_010EditorListCompiler):
         # Repeat loop for writing offset, filesize
         for template in iter(self):
             # Write offset
-            self._write(struct.pack('<I', calculated_offset))
+            self._write_u32(calculated_offset)
             # Write filesize
             # Don't know why, but actual value is +1
             filesize = len(template.source) + 1
-            self._write(struct.pack('<I', filesize))
+            self._write_u32(filesize)
             # Increase offset
             calculated_offset += filesize
 
