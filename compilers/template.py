@@ -9,6 +9,7 @@ import io
 import re
 import struct
 import os.path
+import contextlib
 
 import logging
 logger = logging.getLogger(__name__)
@@ -80,12 +81,20 @@ class TemplateListCompiler(_010EditorListCompiler):
         # Write End Of File signature
         self._write_eof()
 
+    @staticmethod
+    @contextlib.contextmanager
+    def _restoring_position(*args, **kwds):
+        seekable = args[0] if args else kwds['seekable']
+        offset = seekable.tell()
+        seekable.seek(0)
+        try:
+            yield seekable
+        finally:
+            seekable.seek(offset)
+
     def link(self):
-        offset = self._buffer.tell()
-        self._buffer.seek(0)
-        binary = self._buffer.read()
-        self._buffer.seek(offset)
-        return binary
+        with self._restoring_position(self._buffer) as b:
+            return b.read()
 
     def _write_header(self):
         # Write magic numbers
