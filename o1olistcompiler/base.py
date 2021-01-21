@@ -77,10 +77,6 @@ class Abstract010EditorListCompiler(Compiler, metaclass=abc.ABCMeta):
     def parse(self, stream: IO):
         pass
 
-    @typing.overload
-    def parse(self, source: AnyStr) -> bytes:
-        pass
-
     def add(self, obj):
         self._iterable.append(obj)
 
