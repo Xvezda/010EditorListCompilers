@@ -105,7 +105,7 @@ class _010EditorListCompiler(Abstract010EditorListCompiler):
 
     @typing.overload
     def _write_metadatas(self) -> None:
-        raise NotImplemented
+        raise NotImplementedError
 
     def _write_entries(self) -> None:
         # File datas starting after offset and filesize datas.
